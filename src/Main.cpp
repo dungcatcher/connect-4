@@ -14,49 +14,43 @@ uint64_t yellowPieces = 0;
 //  7  8  9  10 11 12 13
 //  0  1  2   3  4  5  6
 
-bool detectWin(bool turn);
-bool detectWin(bool turn)
+bool detectWin(uint64_t board);
+bool detectWin(uint64_t board)
 {
-	uint64_t bitboard;
-	if (turn)
-		bitboard = redPieces;
-	else
-		bitboard = yellowPieces;
-
 	// Check south east diagonal
-	uint64_t tempBoard = bitboard & (bitboard >> 6);
+	uint64_t tempBoard = board & (board >> 6);
 	if (tempBoard & (tempBoard >> 2 * 6))
 		return true;
 	// Check vertical
-	tempBoard = bitboard & (bitboard >> 7);
+	tempBoard = board & (board >> 7);
 	if (tempBoard & (tempBoard >> 2 * 7))
 		return true;
 	// Check north east diagonal
-	tempBoard = bitboard & (bitboard >> 8);
+	tempBoard = board & (board >> 8);
 	if (tempBoard & (tempBoard >> 2 * 8))
 		return true;
 	// Check horizontal
-	tempBoard = bitboard & (bitboard >> 1);
+	tempBoard = board & (board >> 1);
 	if (tempBoard & (tempBoard >> 2 * 1))
 		return true;
 
 	return false;
 }
 
-void updateBoard(sf::RenderWindow* window, sf::Sprite* boardSprite, bool turn);
-void updateBoard(sf::RenderWindow* window, sf::Sprite* boardSprite, bool turn)
+void updateBoard(sf::RenderWindow* window, sf::Sprite* boardSprite, bool turn, float ssf);
+void updateBoard(sf::RenderWindow* window, sf::Sprite* boardSprite, bool turn, float ssf)
 {
 	window->clear();
 	window->draw(*boardSprite);
 
-	sf::CircleShape redPiece(60);
+	sf::CircleShape redPiece(40 * ssf);
 	redPiece.setFillColor(sf::Color::Red);
-	redPiece.setOrigin(sf::Vector2f(60, 60));
-	sf::CircleShape yellowPiece(60);
+	redPiece.setOrigin(sf::Vector2f(40 * ssf, 40 * ssf));
+	sf::CircleShape yellowPiece(40 * ssf);
 	yellowPiece.setFillColor(sf::Color::Yellow);
-	yellowPiece.setOrigin(sf::Vector2f(60, 60));
+	yellowPiece.setOrigin(sf::Vector2f(40 * ssf, 40 * ssf));
 
-	if (detectWin(turn))
+	if (detectWin((turn) ? yellowPieces : redPieces)) // opposite turn as the other person just played
 	{
 		std::cout << "win\n";
 	}
@@ -89,11 +83,11 @@ void updateBoard(sf::RenderWindow* window, sf::Sprite* boardSprite, bool turn)
 	window->display();
 }
 
-int generateMove(int column);
-int generateMove(int column)
+int generateMove(int column, uint64_t redBoard, uint64_t yellowBoard);
+int generateMove(int column, uint64_t redBoard, uint64_t yellowBoard)
 {
 	// Returns the y value of the column clicked on
-	uint64_t vacantPositions = ~(redPieces | yellowPieces);
+	uint64_t vacantPositions = ~(redBoard | yellowBoard);
 	vacantPositions >>= column;
 	int row = -1; // If row is -1 there are no legal spaces
 
@@ -126,13 +120,12 @@ long int perft(int currentPly, int maxPly, bool turn, uint64_t redBoard, uint64_
 
 	for (int col = 0; col < 7; col++)
 	{
-		int row = generateMove(col);
+		int row = generateMove(col, redBoard, yellowBoard);
 		if (row != -1)
 		{
 			if (continueSearch)
 			{
-				uint64_t newBoard = makeMove(row, col, (turn) ? redBoard : yellowBoard);
-				nodes += perft(currentPly + 1, maxPly, !turn, (!turn) ? newBoard : redBoard, (turn) ? newBoard : yellowBoard);
+				nodes += perft(currentPly + 1, maxPly, !turn, (turn) ? makeMove(row, col, redBoard) : redBoard, (turn) ? yellowBoard : makeMove(row, col, yellowBoard));
 			}
 			else
 			{
@@ -167,7 +160,7 @@ int main()
 	bool turn = 1; // 1 = red, 0 = yellow
 	bool mouseDown = false;
 
-	std::cout << perft(1, 9, 1, redPieces, yellowPieces) << "\n";
+	std::cout << perft(1, 7, 1, redPieces, yellowPieces) << "\n";
 
 	window.setFramerateLimit(60);
 
@@ -184,7 +177,7 @@ int main()
 				if (!mouseDown)
 				{
 					int column = sf::Mouse::getPosition(window).x / (window.getSize().x / 7);
-					int row = generateMove(column);
+					int row = generateMove(column, redPieces, yellowPieces);
 					if (row != -1)
 					{
 						unsigned int bitPosition = row * 7 + column;
@@ -207,7 +200,7 @@ int main()
 				mouseDown = false;
 		}
 
-		updateBoard(&window, &boardSprite, turn);
+		updateBoard(&window, &boardSprite, turn, screenScalingFactor);
 	}
 
 	return 0;
