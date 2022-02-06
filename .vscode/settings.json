@@ -85,7 +85,22 @@
 		"streambuf": "cpp",
 		"thread": "cpp",
 		"typeinfo": "cpp",
-		"variant": "cpp"
+		"variant": "cpp",
+		"hash_map": "cpp",
+		"bit": "cpp",
+		"compare": "cpp",
+		"complex": "cpp",
+		"concepts": "cpp",
+		"forward_list": "cpp",
+		"unordered_set": "cpp",
+		"source_location": "cpp",
+		"numbers": "cpp",
+		"semaphore": "cpp",
+		"stop_token": "cpp",
+		"cfenv": "cpp",
+		"cinttypes": "cpp",
+		"typeindex": "cpp",
+		"valarray": "cpp"
 	},
 	"terminal.integrated.automationShell.windows": "C:/Program Files/Git/bin/bash.exe",
 	"terminal.integrated.env.windows": {
