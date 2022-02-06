@@ -125,7 +125,10 @@ long int perft(int currentPly, int maxPly, bool turn, uint64_t redBoard, uint64_
 		{
 			if (continueSearch)
 			{
-				nodes += perft(currentPly + 1, maxPly, !turn, (turn) ? makeMove(row, col, redBoard) : redBoard, (turn) ? yellowBoard : makeMove(row, col, yellowBoard));
+				const auto newBoard = (turn) ? makeMove(row, col, redBoard) : makeMove(row, col, yellowBoard);
+				if (detectWin(newBoard))
+					return nodes;
+				nodes += perft(currentPly + 1, maxPly, !turn, (turn) ? newBoard : redBoard, (turn) ? yellowBoard : newBoard);
 			}
 			else
 			{
@@ -133,6 +136,80 @@ long int perft(int currentPly, int maxPly, bool turn, uint64_t redBoard, uint64_
 			}
 		}
 	}
+	return nodes;
+}
+
+struct perftThreadInfo
+{
+	int maxPly;
+	bool turn;
+	uint64_t redBoard;
+	uint64_t yellowBoard;
+	sf::Mutex* mutex;
+	long int* nodes;
+	uint startingCol;
+};
+
+// void updateGlobaPerft(int* maxPly, bool* turn, uint64_t* redBoard, uint64_t* yellowBoard, sf::Mutex* mutex, long int* nodes);
+// void updateGlobaPerft(int* maxPly, bool* turn, uint64_t* redBoard, uint64_t* yellowBoard, sf::Mutex* mutex, long int* nodes)
+void updateGlobaPerft(perftThreadInfo info);
+void updateGlobaPerft(perftThreadInfo info)
+{
+	const auto nodesToAdd = perft(2, info.maxPly, info.turn, info.redBoard, info.yellowBoard);
+	std::cout << "Nodes to add from starting col " << info.startingCol << ": " << nodesToAdd << "\n";
+	info.mutex->lock();
+	*info.nodes += nodesToAdd;
+	info.mutex->unlock();
+}
+
+long int multiThreadedPerft(int maxPly, bool turn, uint64_t redBoard, uint64_t yellowBoard);
+long int multiThreadedPerft(int maxPly, bool turn, uint64_t redBoard, uint64_t yellowBoard)
+{
+	long int nodes = 0;
+	sf::Mutex nodesMutex;
+	perftThreadInfo threadInfo;
+	threadInfo.maxPly = maxPly;
+	threadInfo.turn = turn;
+	threadInfo.mutex = &nodesMutex;
+	threadInfo.nodes = &nodes;
+
+	const bool continueSearch = 1 < maxPly;
+
+	std::thread threads[7];
+	for (int col = 0; col < 7; col++)
+	{
+		int row = generateMove(col, redBoard, yellowBoard);
+		if (row != -1)
+		{
+			if (continueSearch)
+			{
+				const auto newBoard = (turn) ? makeMove(row, col, redBoard) : makeMove(row, col, yellowBoard);
+				if (detectWin(newBoard))
+					nodes++;
+				if (turn)
+				{
+					threadInfo.redBoard = newBoard;
+					threadInfo.yellowBoard = yellowBoard;
+				}
+				else
+				{
+					threadInfo.redBoard = newBoard;
+					threadInfo.yellowBoard = yellowBoard;
+				}
+				threadInfo.startingCol = col;
+				threads[col] = std::thread(&updateGlobaPerft, threadInfo);
+			}
+			else
+				nodes++;
+		}
+	}
+
+	for (size_t i = 0; i < 7; i++)
+		if (threads[i].joinable())
+			threads[i].join();
+
+	std::cout << "Multi Threaded Perft Results with Ply " << maxPly << ": " << nodes << "\n";
+
 	return nodes;
 }
 
@@ -160,7 +237,8 @@ int main()
 	bool turn = 1; // 1 = red, 0 = yellow
 	bool mouseDown = false;
 
-	std::cout << perft(1, 7, 1, redPieces, yellowPieces) << "\n";
+	multiThreadedPerft(12, 1, redPieces, yellowPieces);
+	// perft(1, 12, true, 0, 0);
 
 	window.setFramerateLimit(60);
 
