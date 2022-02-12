@@ -88,6 +88,7 @@ int generateMove(int column, uint64_t redBoard, uint64_t yellowBoard)
 {
 	// Returns the y value of the column clicked on
 	uint64_t vacantPositions = ~(redBoard | yellowBoard);
+	// std::cout << vacantPositicurrentNode->checkedCol = currentNode->checkedCol + 1;ons << "\n";
 	vacantPositions >>= column;
 	int row = -1; // If row is -1 there are no legal spaces
 
@@ -127,7 +128,7 @@ long int perft(int currentPly, int maxPly, bool turn, uint64_t redBoard, uint64_
 			{
 				const auto newBoard = (turn) ? makeMove(row, col, redBoard) : makeMove(row, col, yellowBoard);
 				if (detectWin(newBoard))
-					return nodes;
+					return 0;
 				nodes += perft(currentPly + 1, maxPly, !turn, (turn) ? newBoard : redBoard, (turn) ? yellowBoard : newBoard);
 			}
 			else
@@ -186,18 +187,21 @@ long int multiThreadedPerft(int maxPly, bool turn, uint64_t redBoard, uint64_t y
 				const auto newBoard = (turn) ? makeMove(row, col, redBoard) : makeMove(row, col, yellowBoard);
 				if (detectWin(newBoard))
 					nodes++;
-				if (turn)
-				{
-					threadInfo.redBoard = newBoard;
-					threadInfo.yellowBoard = yellowBoard;
-				}
 				else
 				{
-					threadInfo.redBoard = newBoard;
-					threadInfo.yellowBoard = yellowBoard;
+					if (turn)
+					{
+						threadInfo.redBoard = newBoard;
+						threadInfo.yellowBoard = yellowBoard;
+					}
+					else
+					{
+						threadInfo.redBoard = newBoard;
+						threadInfo.yellowBoard = yellowBoard;
+					}
+					threadInfo.startingCol = col;
+					threads[col] = std::thread(&updateGlobaPerft, threadInfo);
 				}
-				threadInfo.startingCol = col;
-				threads[col] = std::thread(&updateGlobaPerft, threadInfo);
 			}
 			else
 				nodes++;
@@ -211,6 +215,163 @@ long int multiThreadedPerft(int maxPly, bool turn, uint64_t redBoard, uint64_t y
 	std::cout << "Multi Threaded Perft Results with Ply " << maxPly << ": " << nodes << "\n";
 
 	return nodes;
+}
+
+// 0 is board1 and is Red
+// 1 is board2 and is Yellow
+
+void solveConnect4();
+void solveConnect4()
+{
+	std::thread threads[49];
+	for (int col = 0; col < 7; col++)
+	{
+		uint64_t board1 = makeMove(0, col, 0);
+		for (int col2 = 0; col2 < 7; col2++)
+		{
+			int row = generateMove(col2, board1, 0);
+			uint64_t board2 = makeMove(row, col2, 0);
+			UNUSED(board2);
+		}
+	}
+}
+
+struct node
+{
+	node* parent;
+	std::vector<node*> children = {};
+	uint64_t board1;
+	uint64_t board2;
+	int col;
+	int checkedCol;
+	bool isLoss;
+	bool turn; // just played
+	int depth;
+};
+
+void deleteNodeChildrenRecurrsive(node* deleteNode);
+void deleteNodeChildrenRecurrsive(node* deleteNode)
+{
+	for (auto child : deleteNode->children)
+	{
+		deleteNodeChildrenRecurrsive(child);
+		delete child;
+	}
+}
+
+void displayNodeLayer(node* currentNode);
+void displayNodeLayer(node* currentNode)
+{
+	for (int i = 0; i < currentNode->depth; i++)
+	{
+		std::cout << '-';
+	}
+	std::cout << " isLoss: " << currentNode->isLoss << " Boards: " << currentNode->board1 << " | " << currentNode->board2;
+}
+
+void displayNodeTree(node* startingNode);
+void displayNodeTree(node* startingNode)
+{
+	std::cout << "Done\n";
+	displayNodeLayer(startingNode);
+}
+
+void solveFromThread();
+void solveFromThread()
+{
+	node startingNode;
+	startingNode.board1 = 0;
+	startingNode.board2 = 0;
+	startingNode.depth = 0;
+	startingNode.checkedCol = 0;
+	startingNode.turn = 1; // yellow just played therefore red now plays
+	startingNode.parent = nullptr;
+	startingNode.isLoss = false;
+	startingNode.col = 100;
+
+	node* currentNode = &startingNode;
+	while (true)
+	{
+		// std::cout << currentNode->depth << " | " << currentNode->col << "\n";
+		if (currentNode->depth == 0 && currentNode != &startingNode)
+		{
+			displayNodeTree(currentNode);
+			return;
+		}
+		else if (currentNode->isLoss)
+		{
+			// std::cout << "Node is loss\n";
+			deleteNodeChildrenRecurrsive(currentNode);
+			currentNode->children.clear();
+			if (!currentNode->turn)
+				// yellow just played
+				currentNode->parent->isLoss = true;
+			currentNode = currentNode->parent;
+		}
+		else
+		{
+			if (currentNode->checkedCol < 7)
+			{
+				int row = generateMove(currentNode->checkedCol, currentNode->board1, currentNode->board2);
+				if (row != -1)
+				{
+					node* newNode;
+					newNode = new node;
+
+					// turn ? red just played : yellow
+					newNode->board1 = (currentNode->turn) ? currentNode->board1 : makeMove(row, currentNode->checkedCol, currentNode->board1);
+					newNode->board2 = (!currentNode->turn) ? currentNode->board2 : makeMove(row, currentNode->checkedCol, currentNode->board2);
+					newNode->parent = currentNode;
+					newNode->depth = currentNode->depth + 1;
+					newNode->col = currentNode->checkedCol;
+					newNode->turn = !currentNode->turn;
+					newNode->isLoss = false;
+					newNode->checkedCol = 0;
+					newNode->children = {};
+
+					currentNode->children.push_back(newNode);
+					currentNode->checkedCol = currentNode->checkedCol + 1;
+
+					currentNode = newNode;
+
+					if (detectWin((currentNode->turn) ? currentNode->board1 : currentNode->board2))
+					{
+						std::cout << "Win" << ((currentNode->turn) ? currentNode->board1 : currentNode->board2) << "\n";
+						if (currentNode->turn)
+						{
+							// go to parent node
+							currentNode = currentNode->parent;
+						}
+						else
+						{
+							// prune tree
+							currentNode->parent->isLoss = true;
+							currentNode = currentNode->parent;
+						}
+					}
+				}
+				else
+				{
+					// std::cout << "Illegal\n";
+					currentNode->checkedCol = currentNode->checkedCol + 1;
+				}
+			}
+			else
+			{
+				// checked all sub nodes
+
+				// now check if all sub nodes are a loss
+				bool isLoss = true;
+				for (auto child : currentNode->children)
+					if (!child->isLoss)
+						isLoss = false;
+				if (isLoss)
+					currentNode->isLoss = true;
+				else
+					currentNode = currentNode->parent;
+			}
+		}
+	}
 }
 
 int main()
@@ -237,7 +398,8 @@ int main()
 	bool turn = 1; // 1 = red, 0 = yellow
 	bool mouseDown = false;
 
-	multiThreadedPerft(12, 1, redPieces, yellowPieces);
+	solveFromThread();
+	// multiThreadedPerft(12, 1, redPieces, yellowPieces);
 	// perft(1, 12, true, 0, 0);
 
 	window.setFramerateLimit(60);

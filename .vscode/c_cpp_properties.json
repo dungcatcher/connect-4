@@ -3,13 +3,13 @@
 		{
 			"name": "Linux",
 			"intelliSenseMode": "linux-gcc-x64",
+			"compilerPath": "/usr/bin/gcc",
 			"cStandard": "c11",
 			"cppStandard": "c++17",
 			"includePath": [
 				"${workspaceFolder}/src",
 				"${workspaceFolder}/lib",
 				"${workspaceFolder}/test",
-				"~/SFML-2.5.1/include",
 				"/usr/local/include/**",
 				"/usr/include/**"
 			],
